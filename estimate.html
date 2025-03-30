@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marriage Package Estimate</title>
+    <script>
+        document.addEventListener("DOMContentLoaded", async function () {
+            const params = new URLSearchParams(window.location.search);
+            const registrationId = params.get("registrationId");
+            if (!registrationId) {
+                document.body.innerHTML = "<h2>Invalid Request: No Registration ID Found</h2>";
+                return;
+            }
+            
+            try {
+                const response = await fetch(`http://localhost:3000/get-registration?registrationId=${registrationId}`);
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.message);
+                
+                const { groomName, brideName, marriageDate, packageSelect, numberOfGuests } = result.data;
+                document.getElementById("groomName").textContent = groomName;
+                document.getElementById("brideName").textContent = brideName;
+                document.getElementById("marriageDate").textContent = marriageDate;
+                document.getElementById("packageSelect").textContent = packageSelect;
+                document.getElementById("numberOfGuests").textContent = numberOfGuests;
+                
+                // Estimate pricing logic
+                const basePrices = { "Basic": 50000, "Premium": 150000, "Luxury": 300000 };
+                const pricePerGuest = { "Basic": 500, "Premium": 1000, "Luxury": 2000 };
+                
+                const estimatedCost = basePrices[packageSelect] + (pricePerGuest[packageSelect] * numberOfGuests);
+                document.getElementById("estimatedCost").textContent = `₹${estimatedCost.toLocaleString()}`;
+            } catch (error) {
+                document.body.innerHTML = `<h2>Error: ${error.message}</h2>`;
+            }
+        });
+    </script>
+</head>
+<body>
+    <h1>Marriage Package Estimate</h1>
+    <p><strong>Groom Name:</strong> <span id="groomName"></span></p>
+    <p><strong>Bride Name:</strong> <span id="brideName"></span></p>
+    <p><strong>Marriage Date:</strong> <span id="marriageDate"></span></p>
+    <p><strong>Selected Package:</strong> <span id="packageSelect"></span></p>
+    <p><strong>Number of Guests:</strong> <span id="numberOfGuests"></span></p>
+    <h2>Estimated Cost: <span id="estimatedCost"></span></h2>
+</body>
+</html>
