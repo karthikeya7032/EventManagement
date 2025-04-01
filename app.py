@@ -46,40 +46,65 @@
 
 # if __name__ == "__main__":
 #     app.run(debug=True)
-
 from flask import Flask, request, jsonify
-import pickle
+from flask_cors import CORS
+import joblib
 import numpy as np
 
 app = Flask(__name__)
+CORS(app)
 
-# Load Model
+# Load the model and encoders
 try:
-    with open("model.pkl", "rb") as model_file:
-        model = pickle.load(model_file)
-    print("Model loaded successfully!")
-except FileNotFoundError:
+    model = joblib.load('wedding_cost_model.pkl')
+    label_encoder_religion = joblib.load('religion_encoder.pkl')
+    label_encoder_package = joblib.load('package_encoder.pkl')
+    print("Model and encoders loaded successfully!")
+except FileNotFoundError as e:
+    print(f"Error loading model or encoders: {e}")
     model = None
-    print("No valid model found!")
+    label_encoder_religion = None
+    label_encoder_package = None
 
-@app.route("/predict", methods=["POST"])
-def predict_price():
-    data = request.json
+@app.route('/predict', methods=['POST'])
+def predict():
+    if model is None or label_encoder_religion is None or label_encoder_package is None:
+        return jsonify({'error': 'Model or encoders not loaded'}), 500
 
-    if not model:
-        return jsonify({"message": "Model not found", "predictedPrice": 0}), 500
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No JSON received'}), 400
 
-    # Prepare input for the model
-    input_data = np.array([
-        int(data["packageSelect"] == "Premium"),
-        int(data["packageSelect"] == "Luxury"),
-        int(data["numberOfGuests"])
-    ]).reshape(1, -1)
+        if not all(k in data for k in ("religion", "package", "guest_count")):
+            return jsonify({'error': 'Missing required fields'}), 400
 
-    # Predict price
-    predicted_price = model.predict(input_data)[0]
+        religion = data['religion']
+        package = data['package']
+        guest_count = data['guest_count']
 
-    return jsonify({"predictedPrice": predicted_price}), 200
+        # Encode the input values
+        try:
+          encoded_religion = label_encoder_religion.transform([religion])[0]
+          encoded_package = label_encoder_package.transform([package])[0]
+        except ValueError as e:
+            return jsonify({'error': f"Invalid religion or package: {e}"}), 400
 
-if __name__ == "__main__":
-    app.run(debug=True, port=5000)  # Running Flask on port 5000
+        # Prepare input for the model
+        input_data = np.array([encoded_religion, encoded_package, guest_count]).reshape(1, -1)
+
+        # Predict the cost
+        predicted_cost = model.predict(input_data)[0]
+
+        return jsonify({
+            'predicted_cost': float(predicted_cost), #ensure it is json serializable.
+            'religion': religion,
+            'package': package
+        })
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)

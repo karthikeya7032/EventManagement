@@ -97,9 +97,11 @@
 //     });
 //   });
 // 
+// script.js
 document.addEventListener("DOMContentLoaded", function () {
     const form = document.getElementById("registrationForm");
     const submitBtn = document.getElementById("submitBtn");
+
     const groomName = document.getElementById("groomName");
     const brideName = document.getElementById("brideName");
     const groomAadhaar = document.getElementById("groomAadhaar");
@@ -107,65 +109,53 @@ document.addEventListener("DOMContentLoaded", function () {
     const groomAgeSelect = document.getElementById("groomAge");
     const brideAgeSelect = document.getElementById("brideAge");
     const marriageDate = document.getElementById("marriageDate");
-    const packageSelect = document.getElementById("packageSelect");
+    const packageSlider = document.getElementById("packageSelect");
     const selectedPackage = document.getElementById("selectedPackage");
     const phoneNumber = document.getElementById("phoneNumber");
     const marriageTradition = document.getElementById("marriageTradition");
     const guestCount = document.getElementById("guestCount");
 
-    // Set minimum date to today
+    const packageLabels = ["Basic", "Premium", "Luxury"];
+
+    // Set min date
     const today = new Date().toISOString().split('T')[0];
     marriageDate.setAttribute("min", today);
 
-    // Input sanitization
+    // Input validation
     groomName.addEventListener("input", () => groomName.value = groomName.value.replace(/[^a-zA-Z\s]/g, ""));
     brideName.addEventListener("input", () => brideName.value = brideName.value.replace(/[^a-zA-Z\s]/g, ""));
     groomAadhaar.addEventListener("input", () => groomAadhaar.value = groomAadhaar.value.replace(/\D/g, "").slice(0, 12));
     brideAadhaar.addEventListener("input", () => brideAadhaar.value = brideAadhaar.value.replace(/\D/g, "").slice(0, 12));
     phoneNumber.addEventListener("input", () => phoneNumber.value = phoneNumber.value.replace(/\D/g, "").slice(0, 10));
-    guestCount.addEventListener("input", function () {
-        this.value = this.value.replace(/\D/g, "").slice(0, 4); // Allow only numbers
-    });
+    guestCount.addEventListener("input", () => guestCount.value = guestCount.value.replace(/\D/g, "").slice(0, 4));
 
-    // Populate age dropdowns correctly
-    function populateAgeDropdown(selectElement, minAge, maxAge) {
-        selectElement.innerHTML = ""; // Clear previous options
-        let defaultOption = document.createElement("option");
-        defaultOption.value = "";
-        defaultOption.textContent = "Select Age";
-        defaultOption.disabled = true;
-        defaultOption.selected = true;
-        selectElement.appendChild(defaultOption);
-
-        for (let age = minAge; age <= maxAge; age++) {
-            let option = document.createElement("option");
+    // Age dropdowns
+    function populateAgeDropdown(select, min, max) {
+        select.innerHTML = "";
+        select.innerHTML = '<option value="" disabled selected>Select Age</option>';
+        for (let age = min; age <= max; age++) {
+            const option = document.createElement("option");
             option.value = age;
             option.textContent = age;
-            selectElement.appendChild(option);
+            select.appendChild(option);
         }
     }
     populateAgeDropdown(groomAgeSelect, 21, 100);
     populateAgeDropdown(brideAgeSelect, 18, 100);
 
-    // Package selection logic
-    const packageLabels = ["Basic", "Premium", "Luxury"];
-    packageSelect.addEventListener("input", function () {
-        let selectedIndex = parseInt(this.value);
-        selectedPackage.textContent = packageLabels[selectedIndex] || "Basic"; // Update UI correctly
+    // Update package label
+    packageSlider.addEventListener("input", () => {
+        selectedPackage.textContent = packageLabels[parseInt(packageSlider.value)];
         validateForm();
     });
 
-    // Validate form to show submit button
+    // Show submit only if form is valid
     function validateForm() {
-        if (form.checkValidity()) {
-            submitBtn.style.display = "block";
-        } else {
-            submitBtn.style.display = "none";
-        }
+        submitBtn.style.display = form.checkValidity() ? "block" : "none";
     }
     form.addEventListener("input", validateForm);
 
-    // Form submission
+    // Combined form submit
     form.addEventListener("submit", async function (e) {
         e.preventDefault();
 
@@ -177,7 +167,7 @@ document.addEventListener("DOMContentLoaded", function () {
             groomAge: parseInt(groomAgeSelect.value),
             brideAge: parseInt(brideAgeSelect.value),
             marriageDate: marriageDate.value,
-            packageSelect: packageLabels[parseInt(packageSelect.value)] || "Basic",
+            packageSelect: packageLabels[parseInt(packageSlider.value)],
             phoneNumber: phoneNumber.value.trim(),
             religion: marriageTradition.value,
             numberOfGuests: parseInt(guestCount.value) || 0
@@ -187,22 +177,41 @@ document.addEventListener("DOMContentLoaded", function () {
             submitBtn.disabled = true;
             submitBtn.textContent = "Submitting...";
 
-            const response = await fetch("http://localhost:3000/submit-form", {
+            // First: Send to prediction endpoint
+            const predictionRes = await fetch("http://localhost:5000/predict", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(formData),
+                body: JSON.stringify({
+                    religion: formData.religion,
+                    package: formData.packageSelect,
+                    guest_count: formData.numberOfGuests
+                })
             });
-            const result = await response.json();
 
-            if (!response.ok) {
+            const predictionData = await predictionRes.json();
+
+            if (!predictionRes.ok) {
+                throw new Error(predictionData.error || "Prediction failed");
+            }
+
+            // Second: Send full registration to /submit-form
+            const regResponse = await fetch("/submit-form", {
+                method: "POST", // Change to POST to match your Node.js route
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(formData)
+            });
+
+            if (!regResponse.ok) {
+                const result = await regResponse.json();
                 throw new Error(result.message || "Submission failed");
             }
 
-            alert(`Registration successful! Your reference ID: ${result.data.registrationId}`);
-            form.reset();
-            submitBtn.style.display = "none";
+            const result = await regResponse.json(); // Parse the JSON response
+            alert(`✅ Wedding cost estimated: ₹${result.predictedCost.toFixed(2)}`);
+            window.location.href = result.redirectUrl; // Redirect using the URL from the response
+
         } catch (error) {
-            alert(`Error: ${error.message}`);
+            alert("🚫 Error: " + error.message);
         } finally {
             submitBtn.disabled = false;
             submitBtn.textContent = "Submit Registration";
