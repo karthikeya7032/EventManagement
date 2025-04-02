@@ -209,7 +209,8 @@ const registrationSchema = new mongoose.Schema({
     packageSelect: String,
     phoneNumber: String,
     religion: String,
-    numberOfGuests: Number
+    numberOfGuests: Number,
+    predictedCost: Number // Add predictedCost field to the schema
 });
 const Registration = mongoose.model('Registration', registrationSchema);
 
@@ -256,6 +257,8 @@ app.post('/submit-form', async (req, res) => {
         }
 
         const registrationId = uuidv4();
+        const predictedCost = await predictCost(religion, packageSelect, numberOfGuests);
+
         const newRegistration = new Registration({
             registrationId,
             groomName,
@@ -268,11 +271,10 @@ app.post('/submit-form', async (req, res) => {
             packageSelect,
             phoneNumber,
             religion,
-            numberOfGuests
+            numberOfGuests,
+            predictedCost // Save predictedCost in the document
         });
         await newRegistration.save();
-
-        const predictedCost = await predictCost(religion, packageSelect, numberOfGuests);
 
         res.json({
             registrationId: registrationId,

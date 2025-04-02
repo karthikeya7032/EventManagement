@@ -155,7 +155,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     form.addEventListener("input", validateForm);
 
-    // Combined form submit
+    // Form submit
     form.addEventListener("submit", async function (e) {
         e.preventDefault();
 
@@ -177,26 +177,9 @@ document.addEventListener("DOMContentLoaded", function () {
             submitBtn.disabled = true;
             submitBtn.textContent = "Submitting...";
 
-            // First: Send to prediction endpoint
-            const predictionRes = await fetch("http://localhost:5000/predict", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    religion: formData.religion,
-                    package: formData.packageSelect,
-                    guest_count: formData.numberOfGuests
-                })
-            });
-
-            const predictionData = await predictionRes.json();
-
-            if (!predictionRes.ok) {
-                throw new Error(predictionData.error || "Prediction failed");
-            }
-
-            // Second: Send full registration to /submit-form
+            // Send full registration to /submit-form (includes prediction)
             const regResponse = await fetch("/submit-form", {
-                method: "POST", // Change to POST to match your Node.js route
+                method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(formData)
             });
@@ -206,9 +189,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 throw new Error(result.message || "Submission failed");
             }
 
-            const result = await regResponse.json(); // Parse the JSON response
+            const result = await regResponse.json();
             alert(`✅ Wedding cost estimated: ₹${result.predictedCost.toFixed(2)}`);
-            window.location.href = result.redirectUrl; // Redirect using the URL from the response
+            window.location.href = result.redirectUrl;
 
         } catch (error) {
             alert("🚫 Error: " + error.message);

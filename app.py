@@ -85,8 +85,8 @@ def predict():
 
         # Encode the input values
         try:
-          encoded_religion = label_encoder_religion.transform([religion])[0]
-          encoded_package = label_encoder_package.transform([package])[0]
+            encoded_religion = label_encoder_religion.transform([religion])[0]
+            encoded_package = label_encoder_package.transform([package])[0]
         except ValueError as e:
             return jsonify({'error': f"Invalid religion or package: {e}"}), 400
 
@@ -97,7 +97,7 @@ def predict():
         predicted_cost = model.predict(input_data)[0]
 
         return jsonify({
-            'predicted_cost': float(predicted_cost), #ensure it is json serializable.
+            'predicted_cost': float(predicted_cost),
             'religion': religion,
             'package': package
         })
